@@ -257,6 +257,23 @@
       font-size: 0.85rem;
       padding: 20px 0;
     }
+
+    footer {
+      margin-top: 24px;
+      padding: 16px;
+      text-align: center;
+      font-size: 0.75rem;
+      color: #bbb;
+      max-width: 500px;
+      line-height: 1.5;
+    }
+
+    footer a {
+      color: #b35a7a;
+      text-decoration: none;
+    }
+
+    footer a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -299,6 +316,12 @@
 
   <div class="section-title">Kick Log</div>
   <div class="log-container" id="log"></div>
+
+  <footer>
+    No data leaves your device. All kicks are stored locally in your browser.
+    No analytics, no cookies, no tracking.
+    <br><a href="https://github.com/allancorbett/babykicks">View on GitHub</a>
+  </footer>
 
   <script>
     const STORAGE_KEY = 'babykicks';
