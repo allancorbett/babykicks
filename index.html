@@ -398,7 +398,7 @@
 
     // Clear all
     function clearAll() {
-      if (confirm('Delete all recorded kicks?')) {
+      if (confirm('Delete all recorded kicks?\n\nTip: You may want to export a CSV backup first.')) {
         saveKicks([]);
         render();
       }
