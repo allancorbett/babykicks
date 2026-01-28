@@ -99,7 +99,7 @@
 
     canvas {
       width: 100% !important;
-      height: 200px !important;
+      height: 260px !important;
     }
 
     /* Kick log */
@@ -292,7 +292,7 @@
     </div>
   </div>
 
-  <div class="section-title">Kicks per Day</div>
+  <div class="section-title">Kick Pattern (last 14 days)</div>
   <div class="chart-container">
     <canvas id="chart"></canvas>
   </div>
@@ -442,7 +442,7 @@
       drawChart(kicks);
     }
 
-    // Bar chart (no dependencies)
+    // Scatter plot: X = date, Y = time of day
     function drawChart(kicks) {
       const canvas = document.getElementById('chart');
       const ctx = canvas.getContext('2d');
@@ -464,83 +464,85 @@
         return;
       }
 
-      // Count per day for last 14 days
-      const counts = {};
-      kicks.forEach(iso => {
-        const dk = dateKey(iso);
-        counts[dk] = (counts[dk] || 0) + 1;
-      });
+      const padLeft = 38;
+      const padRight = 12;
+      const padTop = 12;
+      const padBottom = 30;
+      const chartW = W - padLeft - padRight;
+      const chartH = H - padTop - padBottom;
 
-      const days = [];
+      // Build 14-day range
+      const dayKeys = [];
+      const dayLabels = [];
       for (let i = 13; i >= 0; i--) {
         const d = new Date();
         d.setDate(d.getDate() - i);
-        const dk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-        days.push({ key: dk, count: counts[dk] || 0, label: `${d.getMonth()+1}/${d.getDate()}` });
+        dayKeys.push(dateKey(d.toISOString()));
+        dayLabels.push(`${d.getMonth()+1}/${d.getDate()}`);
       }
 
-      const max = Math.max(...days.map(d => d.count), 1);
-      const padLeft = 30;
-      const padBottom = 28;
-      const padTop = 10;
-      const barArea = W - padLeft - 10;
-      const barW = Math.min(barArea / days.length - 4, 24);
-      const gap = (barArea - barW * days.length) / (days.length);
-      const chartH = H - padBottom - padTop;
+      // Filter kicks to last 14 days & compute positions
+      const daySet = new Set(dayKeys);
+      const points = [];
+      kicks.forEach(iso => {
+        const dk = dateKey(iso);
+        if (!daySet.has(dk)) return;
+        const d = new Date(iso);
+        const dayIdx = dayKeys.indexOf(dk);
+        const minuteOfDay = d.getHours() * 60 + d.getMinutes();
+        points.push({ dayIdx, minuteOfDay });
+      });
 
-      // Grid lines
+      // Y-axis: hours 0–24 (top=0:00, bottom=24:00)
+      const timeToY = (min) => padTop + (min / 1440) * chartH;
+      const dayToX = (idx) => padLeft + (idx + 0.5) / dayKeys.length * chartW;
+
+      // Horizontal grid lines (every 4 hours)
       ctx.strokeStyle = '#f0e8e8';
       ctx.lineWidth = 1;
-      const gridSteps = Math.min(max, 5);
-      for (let i = 0; i <= gridSteps; i++) {
-        const y = padTop + chartH - (i / gridSteps) * chartH;
+      for (let h = 0; h <= 24; h += 4) {
+        const y = timeToY(h * 60);
         ctx.beginPath();
         ctx.moveTo(padLeft, y);
-        ctx.lineTo(W - 10, y);
+        ctx.lineTo(W - padRight, y);
         ctx.stroke();
+
         ctx.fillStyle = '#bbb';
         ctx.font = '10px sans-serif';
         ctx.textAlign = 'right';
-        ctx.fillText(Math.round((i / gridSteps) * max), padLeft - 4, y + 3);
+        const label = h === 24 ? '0:00' : `${h}:00`;
+        ctx.fillText(label, padLeft - 4, y + 3);
       }
 
-      // Bars
-      days.forEach((d, i) => {
-        const x = padLeft + i * (barW + gap) + gap / 2;
-        const barH = (d.count / max) * chartH;
-        const y = padTop + chartH - barH;
-
-        const grad = ctx.createLinearGradient(x, y, x, padTop + chartH);
-        grad.addColorStop(0, '#f7a8c4');
-        grad.addColorStop(1, '#b35a7a');
-        ctx.fillStyle = grad;
-
+      // Vertical grid lines per day
+      ctx.strokeStyle = '#f5eeee';
+      dayKeys.forEach((_, i) => {
+        const x = dayToX(i);
         ctx.beginPath();
-        const r = Math.min(3, barW / 2);
-        if (barH > r) {
-          ctx.moveTo(x, y + r);
-          ctx.arcTo(x, y, x + r, y, r);
-          ctx.arcTo(x + barW, y, x + barW, y + r, r);
-          ctx.lineTo(x + barW, padTop + chartH);
-          ctx.lineTo(x, padTop + chartH);
-        } else if (d.count > 0) {
-          ctx.rect(x, y, barW, barH);
-        }
+        ctx.moveTo(x, padTop);
+        ctx.lineTo(x, padTop + chartH);
+        ctx.stroke();
+      });
+
+      // X-axis day labels
+      ctx.fillStyle = '#999';
+      ctx.font = '9px sans-serif';
+      ctx.textAlign = 'center';
+      dayKeys.forEach((_, i) => {
+        ctx.fillText(dayLabels[i], dayToX(i), H - 6);
+      });
+
+      // Draw dots
+      points.forEach(p => {
+        const x = dayToX(p.dayIdx);
+        const y = timeToY(p.minuteOfDay);
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(179, 90, 122, 0.7)';
         ctx.fill();
-
-        // Count on top
-        if (d.count > 0) {
-          ctx.fillStyle = '#b35a7a';
-          ctx.font = 'bold 10px sans-serif';
-          ctx.textAlign = 'center';
-          ctx.fillText(d.count, x + barW / 2, y - 3);
-        }
-
-        // Day label
-        ctx.fillStyle = '#999';
-        ctx.font = '9px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(d.label, x + barW / 2, H - 6);
+        ctx.strokeStyle = 'rgba(179, 90, 122, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
       });
     }
 
