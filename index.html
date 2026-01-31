@@ -103,7 +103,7 @@
 
     canvas {
       width: 100% !important;
-      height: 260px !important;
+      height: 400px !important;
     }
 
     /* Kick log */
@@ -313,7 +313,7 @@
     </div>
   </div>
 
-  <div class="section-title">Kick Pattern (last 14 days)</div>
+  <div class="section-title">Kick Pattern</div>
   <div class="chart-container">
     <canvas id="chart"></canvas>
   </div>
@@ -498,26 +498,32 @@
       const chartW = W - padLeft - padRight;
       const chartH = H - padTop - padBottom;
 
-      // Build 14-day range
+      // Build date range from first kick to today
+      const sorted = [...kicks].sort();
+      const firstDate = new Date(sorted[0]);
+      firstDate.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
       const dayKeys = [];
       const dayLabels = [];
-      for (let i = 13; i >= 0; i--) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
+      const d = new Date(firstDate);
+      while (d <= today) {
         dayKeys.push(dateKey(d.toISOString()));
         dayLabels.push(`${d.getMonth()+1}/${d.getDate()}`);
+        d.setDate(d.getDate() + 1);
       }
 
-      // Filter kicks to last 14 days & compute positions
-      const daySet = new Set(dayKeys);
+      // Map all kicks to positions
+      const dayMap = {};
+      dayKeys.forEach((dk, i) => { dayMap[dk] = i; });
       const points = [];
       kicks.forEach(iso => {
         const dk = dateKey(iso);
-        if (!daySet.has(dk)) return;
-        const d = new Date(iso);
-        const dayIdx = dayKeys.indexOf(dk);
-        const minuteOfDay = d.getHours() * 60 + d.getMinutes();
-        points.push({ dayIdx, minuteOfDay });
+        if (!(dk in dayMap)) return;
+        const dt = new Date(iso);
+        const minuteOfDay = dt.getHours() * 60 + dt.getMinutes();
+        points.push({ dayIdx: dayMap[dk], minuteOfDay });
       });
 
       // Y-axis: hours 0–24 (top=0:00, bottom=24:00)
@@ -551,12 +557,16 @@
         ctx.stroke();
       });
 
-      // X-axis day labels
+      // X-axis day labels (skip some if too many days)
       ctx.fillStyle = '#999';
       ctx.font = '9px sans-serif';
       ctx.textAlign = 'center';
+      const maxLabels = Math.floor(chartW / 32);
+      const step = Math.max(1, Math.ceil(dayKeys.length / maxLabels));
       dayKeys.forEach((_, i) => {
-        ctx.fillText(dayLabels[i], dayToX(i), H - 6);
+        if (i % step === 0 || i === dayKeys.length - 1) {
+          ctx.fillText(dayLabels[i], dayToX(i), H - 6);
+        }
       });
 
       // Draw dots
